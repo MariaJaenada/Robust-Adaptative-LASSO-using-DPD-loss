@@ -1,18 +1,7 @@
-## generating outputs for multiple settings
-
-p=500
-n=100
-epsilon = .1
-
-intercept = 1
-num_signal = 1
 
 rm(list=ls())
 
-setwd("G:/Mi unidad/UCM/ARTICULOS/Ad-DPD-LASSO/code/Codigos segunda version")
 library(MASS)
-
-
 library(parallel)
 library(doParallel)
 
@@ -26,8 +15,6 @@ library(flare)
 
 source("dpd_estimation.R")
 source("cv_dpd_samelambda.R")
-
-
 
 # function to get metrics
 get.metrics = function(beta, beta.hat,  sigma, Xtest, Ytest){
@@ -79,18 +66,9 @@ out.fun = function(n, p, num_signal, epsilon, nrep){
     err.mat1 = matrix(NA, ncol=8, nrow=32)
     
     gamma_list = c(0.1, 0.3,0.5, 0.7,1) 
-    #gamma_list = c(0.5,0.7,1)
     for(i in 1:5){
       
-      # if(i == 1 ){lmin = 3e-2; lmax= .09
-      # }else if(i==2){lmin = 2.5e-2; lmax= .07
-      # }else if(i==5){lmin = 1.9e-2; lmax= .06
-      # }else{lmin = 2.1e-2; lmax=.09}
-      
-      if(i == 1 | i ==2 ){lmin = 2.7e-2; lmax= .08
-      #}else if(i==2){lmin = 2.5e-2; lmax= .07
-      #}else if(i==5){lmin = 1.9e-2; lmax= .06
-      }else{lmin = 2.7e-2; lmax=.08}
+      lmin = 2.7e-2; lmax= .08
       
       #LASSO
       t1 = system.time(z <- HBIC.dpd(X, as.matrix(Y), intercept=T,
@@ -148,31 +126,31 @@ out.fun = function(n, p, num_signal, epsilon, nrep){
     beta.MCP = z$fit$beta[,which.min(z$cve)][-1]
     err.mat1[28,] = c(get.metrics(tB, beta.MCP, 1.4826*mad(Y - X %*% beta.MCP), Xtest, Ytest), t3[3])
 
-    # ## LAD-lasso
-    # t4 = system.time(LAD <- slim(X, Y, nlambda=50, q=1, lambda.min.value=.01, verbose = FALSE))
-    # BICvals = as.numeric(with(LAD, lapply(1:nlambda,
-    #                                       function(i) sum(abs(Y - X %*% beta[,i])) +
-    #                                         log(n)*sum(beta[,i]!=0))))
-    # beta.LAD = LAD$beta[,which.min(BICvals)]
-    # err.mat1[29,] = c(get.metrics(tB, beta.LAD, 1.4826*mad(Y - X %*% beta.LAD), Xtest, Ytest), t4[3])
+    ## LAD-lasso
+    t4 = system.time(LAD <- slim(X, Y, nlambda=50, q=1, lambda.min.value=.01, verbose = FALSE))
+    BICvals = as.numeric(with(LAD, lapply(1:nlambda,
+                                           function(i) sum(abs(Y - X %*% beta[,i])) +
+                                             log(n)*sum(beta[,i]!=0))))
+    beta.LAD = LAD$beta[,which.min(BICvals)]
+    err.mat1[29,] = c(get.metrics(tB, beta.LAD, 1.4826*mad(Y - X %*% beta.LAD), Xtest, Ytest), t4[3])
+    rm(LAD)
     
-    #rm(LAD)
     # RLARS
     t5 = system.time(RLARS <- rlars(Y~X))
     err.mat1[30,] = c(get.metrics(tB, coef(RLARS)[-1], getScale(RLARS), Xtest, Ytest), t5[3])
     rm(RLARS)
     
-    # # sLTS
-    # frac<- seq(0,lambda0(X0,Y) ,by=(1/50)*lambda0(X0,Y))
-    # t26 = system.time(sLTS <- sparseLTS(Y~X0, inte=FALSE, lambda=frac[-1], mode="lambda"))
-    # err.mat1[31,] = c(get.metrics(tB, coef(sLTS)[-c(1,2)], getScale(sLTS), Xtest, Ytest), t26[3])
-    # 
-    # rm(sLTS)
-    # 
-    # # RANSAC
-    # t47 = system.time(ransac <- gam.ini(X0, as.matrix(Y), ini.subsamp=0.2, cl.num=1, ini.cand=1000, reg.alpha=1))
-    # err.ma1t[32,] = c(get.metrics(tB, as.matrix(ransac$beta[-1]), ransac$sigma, Xtest, Ytest), t47[3])
-    # rm(ransac)
+    # sLTS
+    frac<- seq(0,lambda0(X0,Y) ,by=(1/50)*lambda0(X0,Y))
+    t26 = system.time(sLTS <- sparseLTS(Y~X0, inte=FALSE, lambda=frac[-1], mode="lambda"))
+    err.mat1[31,] = c(get.metrics(tB, coef(sLTS)[-c(1,2)], getScale(sLTS), Xtest, Ytest), t26[3])
+     
+    rm(sLTS)
+     
+    # RANSAC
+    t47 = system.time(ransac <- gam.ini(X0, as.matrix(Y), ini.subsamp=0.2, cl.num=1, ini.cand=1000, reg.alpha=1))
+    err.ma1t[32,] = c(get.metrics(tB, as.matrix(ransac$beta[-1]), ransac$sigma, Xtest, Ytest), t47[3])
+    rm(ransac)
     gamma_list = c(0.1, 0.3,0.5, 0.7,1) 
     colnames(err.mat1) <- c("Size","TP","TN","MSES", "MSEN", "EE(Sigma)","APrB","Runtime")
     row.names(err.mat1) <- c(paste0("DPD-LASSO gamma=", gamma_list), 
@@ -196,8 +174,8 @@ out.fun = function(n, p, num_signal, epsilon, nrep){
   clusterCall(cl = cl,function() library(rqPen))
   
   clusterCall(cl = cl,function() library(glmnet))
-  # clusterCall(cl = cl,function() library(tilting))
-  # clusterCall(cl = cl,function() library(flare))
+  clusterCall(cl = cl,function() library(tilting))
+  clusterCall(cl = cl,function() library(flare))
   
   clusterCall(cl, function() {source("dpd_estimation.R") })
   clusterCall(cl, function() {source("cv_dpd_samelambda.R") })
@@ -224,41 +202,6 @@ mean_error <- function(out.list){
   return(err)
 }
 
-out500e0n1_list = out.fun(n=100, p=500, num_signal = 1, epsilon = 0, nrep=100)
+#example
+out500e0n1_list = out.fun(n=100, p=500, num_signal = 1, epsilon = 0.05, nrep=100)
 out500e0n1 = mean_error(out500e0n1_list)
-
-out500e0n3_list = out.fun(n=100, p=500, num_signal = 3, epsilon = 0, nrep=100)
-out500e0n3 = mean_error(out500e0n3_list)
-
-#out
-out500e1n1_list = out.fun(n=100, p=500, num_signal = 1, epsilon = .1, nrep=20)
-out500e1n1 = mean_error(out500e1n1_list)
-# 
-out500e1n3_list = out.fun(n=100, p=500, num_signal = 3, epsilon = .1, nrep=20)
-out500e1n3 = mean_error(out500e1n3_list)
-
-# #1000
-out1000e0n1_list = out.fun(n=100, p=1000, num_signal = 1, epsilon = 0, nrep=100)
-out1000e0n1 = mean_error(out1000e0n1_list)
-# 
-out1000e0n3_list = out.fun(n=100, p=1000,  num_signal = 3, epsilon = 0, nrep=100)
-out1000e0n3 = mean_error(out1000e0n3_list)
-
-#out
-out1000e1n1_list = out.fun(n=100, p=1000, num_signal = 1, epsilon = .1, nrep=100)
-out1000e1n1 = mean_error(out1000e1n1_list)
-
-out1000e1n3_list = out.fun(n=100, p=1000,  num_signal = 3, epsilon = .1, nrep=100)
-out1000e1n3 = mean_error(out1000e1n3_list)
-
-save(out500e0n1, file = "outDPDp500e0n1.Rda")
-save(out500e0n3, file = "outDPDp500e0n3.Rda")
-save(out500e1n1, file = "outDPDp500ex1n1.Rda")
-save(out500e1n3, file = "outscadDPDp500ex1n3.Rda")
-
-save(out1000e0n1, file = "outDPDp1000e0n1.Rda")
-save(out1000e0n3, file = "outDPDp1000e0n3.Rda")
-save(out1000e1n1, file = "outDPDp1000ex1n1.Rda")
-save(out1000e1n3, file = "outDPDp1000ex1n3.Rda")
-
-
